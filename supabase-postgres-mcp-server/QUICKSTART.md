@@ -6,6 +6,7 @@ Get your Supabase Postgres MCP Server running in 5 minutes!
 
 ## Prerequisites Checklist
 
+- [ ] Git installed
 - [ ] Docker and docker-compose installed
 - [ ] Access to your Supabase/PostgreSQL database(s)
 - [ ] Database credentials (host, port, database name, user, password)
@@ -13,7 +14,19 @@ Get your Supabase Postgres MCP Server running in 5 minutes!
 
 ---
 
-## Step 1: Configure Environment (2 minutes)
+## Step 1: Clone Repository (30 seconds)
+
+```bash
+# Clone from GitHub
+git clone https://github.com/evilGmonkey/uhu-supabase-postgres-mcp.git
+
+# Navigate to server directory
+cd uhu-supabase-postgres-mcp/supabase-postgres-mcp-server
+```
+
+---
+
+## Step 2: Configure Environment (2 minutes)
 
 ```bash
 # 1. Copy environment template
@@ -44,7 +57,7 @@ CONN_prod_SSLMODE=require
 
 ---
 
-## Step 2: Setup Database Role (1 minute)
+## Step 3: Setup Database Role (1 minute)
 
 Run this SQL on your database to create a read-only role:
 
@@ -66,7 +79,7 @@ ALTER ROLE mcp_readonly BYPASSRLS;
 
 ---
 
-## Step 3: Start Server (1 minute)
+## Step 4: Start Server (1 minute)
 
 ```bash
 # Build and start
@@ -94,7 +107,7 @@ If you see your connection name(s), you're ready! ✅
 
 ---
 
-## Step 4: Connect Cursor (1 minute)
+## Step 5: Connect Cursor (1 minute)
 
 ### macOS/Linux:
 
@@ -153,7 +166,7 @@ Paste this and replace `YOUR_MCP_TOKEN_HERE`:
 
 ---
 
-## Step 5: Test It Out! (30 seconds)
+## Step 6: Test It Out! (30 seconds)
 
 Open Cursor chat and try:
 
