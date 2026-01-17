@@ -16,6 +16,9 @@ from fastapi.middleware.cors import CORSMiddleware
 # ================================================================================
 # Multi-Connection Supabase/Postgres MCP Server
 # ================================================================================
+# Author: Frederick Mbuya
+# License: MIT
+#
 # A Model Context Protocol (MCP) server that provides read-only SQL access
 # to multiple named Supabase/PostgreSQL databases via HTTP + SSE transport.
 #

@@ -701,9 +701,17 @@ Contributions are welcome! Please feel free to submit issues or pull requests.
 
 ---
 
+## Author
+
+**Frederick Mbuya**
+
+---
+
 ## License
 
 MIT License - see LICENSE file for details
+
+Copyright (c) 2025 Frederick Mbuya
 
 ---
 
@@ -718,9 +726,9 @@ MIT License - see LICENSE file for details
 ## Support
 
 - 📖 Documentation: [This README]
-- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/supabase-postgres-mcp-server/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/yourusername/supabase-postgres-mcp-server/discussions)
+- 🐛 Issues: [GitHub Issues](https://github.com/evilGmonkey/uhu-supabase-postgres-mcp/issues)
+- 💬 Discussions: [GitHub Discussions](https://github.com/evilGmonkey/uhu-supabase-postgres-mcp/discussions)
 
 ---
 
-**Made with ❤️ for the MCP community**
+**Created by Frederick Mbuya**

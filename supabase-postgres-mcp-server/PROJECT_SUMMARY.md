@@ -1,5 +1,9 @@
 # Project Summary: Supabase Postgres MCP Server
 
+**Author:** Frederick Mbuya
+**License:** MIT
+**Year:** 2025
+
 ## Overview
 
 This is a production-ready **Model Context Protocol (MCP)** server that provides secure, multi-database SQL access to Supabase and PostgreSQL instances. It enables AI coding assistants like Cursor and Claude Desktop to query multiple databases simultaneously through a single, standardized interface.
@@ -461,5 +465,6 @@ The multi-connection capability is the key differentiator, making it practical f
 
 **Version**: 1.0.0
 **Status**: Production Ready
+**Author**: Frederick Mbuya
 **License**: MIT
 **Created**: January 2025

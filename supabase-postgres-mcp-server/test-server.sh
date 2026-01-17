@@ -3,6 +3,9 @@
 # =============================================================================
 # MCP Server Test Script
 # =============================================================================
+# Author: Frederick Mbuya
+# License: MIT
+#
 # This script tests the MCP server endpoints to verify everything is working.
 #
 # Usage:

@@ -1,6 +1,9 @@
 -- =============================================================================
 -- Create Read-Only PostgreSQL Role for MCP Server
 -- =============================================================================
+-- Author: Frederick Mbuya
+-- License: MIT
+--
 -- This script creates a read-only database role suitable for the MCP server.
 -- Run this script once on each database you want to connect to.
 --
