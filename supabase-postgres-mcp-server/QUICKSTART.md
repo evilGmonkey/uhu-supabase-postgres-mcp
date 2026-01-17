@@ -32,15 +32,22 @@ cd uhu-supabase-postgres-mcp/supabase-postgres-mcp-server
 # 1. Copy environment template
 cp .env.example .env
 
-# 2. Edit the .env file
+# 2. Generate a strong MCP token
+export MCP_TOKEN=$(openssl rand -base64 32)
+echo "Your MCP_TOKEN: $MCP_TOKEN"
+
+# 3. Update .env file with the generated token
+sed -i "s/MCP_TOKEN=CHANGE_ME_TO_A_STRONG_RANDOM_TOKEN/MCP_TOKEN=$MCP_TOKEN/" .env
+
+# 4. Edit .env to add your database credentials
 nano .env  # or use your favorite editor
 ```
 
 **Minimum required configuration:**
 
 ```bash
-# Set a strong token (generate with: openssl rand -base64 32)
-MCP_TOKEN=your-secret-token-here
+# MCP_TOKEN is already set from step 2 above
+MCP_TOKEN=<generated-token-from-step-2>
 
 # Configure at least one database connection
 CONN_prod_HOST=your-supabase-host.supabase.co
@@ -50,7 +57,25 @@ CONN_prod_PASSWORD=your-database-password
 CONN_prod_SSLMODE=require
 ```
 
+**Alternative for Windows (PowerShell):**
+
+```powershell
+# 1. Copy environment template
+cp .env.example .env
+
+# 2. Generate a strong MCP token
+$MCP_TOKEN = [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Maximum 256 }))
+Write-Host "Your MCP_TOKEN: $MCP_TOKEN"
+
+# 3. Update .env file with the generated token
+(Get-Content .env) -replace 'MCP_TOKEN=CHANGE_ME_TO_A_STRONG_RANDOM_TOKEN', "MCP_TOKEN=$MCP_TOKEN" | Set-Content .env
+
+# 4. Edit .env to add your database credentials
+notepad .env
+```
+
 **Important notes:**
+- The MCP_TOKEN is automatically generated and inserted into .env
 - Replace `prod` with any name you want (staging, dev, office, etc.)
 - Use `SSLMODE=require` for Supabase connections
 - Keep `ALLOW_WRITE=false` (read-only is safer)
