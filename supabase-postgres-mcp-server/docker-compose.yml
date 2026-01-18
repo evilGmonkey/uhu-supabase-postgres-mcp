@@ -11,49 +11,16 @@ services:
     ports:
       - "${MCP_PORT:-8799}:8799"
 
+    # Load ALL environment variables from .env file
+    # This includes MCP_TOKEN and all CONN_* variables dynamically
+    env_file:
+      - .env
+
     environment:
       # ===== Server Configuration =====
-      MCP_SERVER_NAME: ${MCP_SERVER_NAME:-supabase-postgres-mcp}
+      # These settings can be overridden in .env
       MCP_HOST: 0.0.0.0
       MCP_PORT: 8799
-      MCP_PATH: ${MCP_PATH:-/mcp}
-
-      # ===== Authentication =====
-      MCP_TOKEN: ${MCP_TOKEN:?MCP_TOKEN is required}
-
-      # ===== Query Limits =====
-      ROW_LIMIT: ${ROW_LIMIT:-5000}
-      QUERY_TIMEOUT_MS: ${QUERY_TIMEOUT_MS:-15000}
-      ALLOW_WRITE: ${ALLOW_WRITE:-false}
-
-      # ===== Logging =====
-      LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      LOG_FORMAT: ${LOG_FORMAT:-json}
-
-      # ===== Database Connections =====
-      # Connection 1 (example: production)
-      CONN_prod_HOST: ${CONN_prod_HOST}
-      CONN_prod_PORT: ${CONN_prod_PORT:-5432}
-      CONN_prod_DBNAME: ${CONN_prod_DBNAME}
-      CONN_prod_USER: ${CONN_prod_USER}
-      CONN_prod_PASSWORD: ${CONN_prod_PASSWORD}
-      CONN_prod_SSLMODE: ${CONN_prod_SSLMODE:-prefer}
-
-      # Connection 2 (example: staging)
-      CONN_staging_HOST: ${CONN_staging_HOST}
-      CONN_staging_PORT: ${CONN_staging_PORT:-5432}
-      CONN_staging_DBNAME: ${CONN_staging_DBNAME}
-      CONN_staging_USER: ${CONN_staging_USER}
-      CONN_staging_PASSWORD: ${CONN_staging_PASSWORD}
-      CONN_staging_SSLMODE: ${CONN_staging_SSLMODE:-prefer}
-
-      # Connection 3 (example: dev)
-      CONN_dev_HOST: ${CONN_dev_HOST}
-      CONN_dev_PORT: ${CONN_dev_PORT:-5432}
-      CONN_dev_DBNAME: ${CONN_dev_DBNAME}
-      CONN_dev_USER: ${CONN_dev_USER}
-      CONN_dev_PASSWORD: ${CONN_dev_PASSWORD}
-      CONN_dev_SSLMODE: ${CONN_dev_SSLMODE:-prefer}
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8799/healthz"]
