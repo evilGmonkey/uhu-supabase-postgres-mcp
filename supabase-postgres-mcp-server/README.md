@@ -15,6 +15,7 @@
 📊 **Smart Limits** - Automatic row limits, query timeouts, and safe query execution
 🚀 **Production Ready** - Structured JSON logging, health checks, Docker support
 🔌 **MCP Compatible** - Works with Cursor, Claude Desktop, and other MCP clients
+🤖 **n8n Integration** - Simple REST API for n8n AI agents and automation workflows
 ⚡ **Real-time** - SSE (Server-Sent Events) for instant query results
 🐳 **Docker Ready** - One-command deployment with docker-compose
 
@@ -27,6 +28,7 @@
 - [Configuration](#configuration)
 - [Usage](#usage)
 - [Cursor Integration](#cursor-integration)
+- [n8n Integration](#n8n-integration)
 - [Security](#security)
 - [API Reference](#api-reference)
 - [Troubleshooting](#troubleshooting)
@@ -373,6 +375,80 @@ Show me the schema for the users table in staging
 ```
 Query dev database: SELECT COUNT(*) FROM orders WHERE created_at > NOW() - INTERVAL '7 days'
 ```
+
+---
+
+## n8n Integration
+
+The server provides simplified REST API endpoints specifically designed for n8n AI agents and automation workflows.
+
+### Quick Start
+
+1. **List Available Connections**
+```bash
+curl -X GET http://localhost:8799/api/connections \
+  -H "Authorization: Bearer YOUR_MCP_TOKEN"
+```
+
+2. **Execute SQL Query**
+```bash
+curl -X POST http://localhost:8799/api/query \
+  -H "Authorization: Bearer YOUR_MCP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "connection": "prod_ro",
+    "sql": "SELECT COUNT(*) FROM vehicles"
+  }'
+```
+
+3. **Get Table Schema**
+```bash
+curl -X POST http://localhost:8799/api/schema \
+  -H "Authorization: Bearer YOUR_MCP_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "connection": "prod_ro",
+    "table": "vehicles"
+  }'
+```
+
+### Available REST Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/connections` | GET | List all available database connections |
+| `/api/query` | POST | Execute SQL query and get results |
+| `/api/schema` | POST | Get table schema information |
+
+### n8n Workflow Example
+
+Create an AI agent in n8n that answers database questions:
+
+1. **HTTP Request Node** - Get available connections
+2. **HTTP Request Node** - Get table schema for context
+3. **AI Agent Node** - Use schema to craft SQL query
+4. **HTTP Request Node** - Execute the query via `/api/query`
+5. **AI Agent Node** - Format results into natural language response
+
+### Complete Documentation
+
+For detailed n8n integration guide with:
+- Complete API reference
+- n8n node configurations
+- AI agent system prompts
+- Specialized tool examples
+- Error handling
+- Security best practices
+
+See: **[N8N_API_GUIDE.md](N8N_API_GUIDE.md)**
+
+### Key Benefits for n8n
+
+✅ **Simple REST API** - No MCP protocol complexity
+✅ **Schema Discovery** - AI agents can learn table structures
+✅ **Parameterized Queries** - Safe from SQL injection
+✅ **Error Handling** - Clear error messages for debugging
+✅ **Same Security** - Uses same auth and safety features as MCP
 
 ---
 

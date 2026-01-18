@@ -403,6 +403,308 @@ async def health():
     }
 
 
+# ================================================================================
+# n8n-Friendly REST API Endpoints
+# ================================================================================
+# These simplified REST endpoints are designed for easy integration with n8n
+# and other tools that don't need the full MCP protocol complexity.
+# All existing MCP endpoints remain fully functional.
+# ================================================================================
+
+@APP.get("/api/connections")
+async def api_list_connections(request: Request):
+    """
+    List all available database connections.
+
+    Returns:
+        {
+            "ok": true,
+            "connections": [
+                {
+                    "name": "prod_ro",
+                    "description": "Production read-only"
+                },
+                ...
+            ]
+        }
+    """
+    if not auth_ok(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    connections_list = [
+        {"name": name, "description": f"Database connection: {name}"}
+        for name in sorted(CONNECTIONS.keys())
+    ]
+
+    return {
+        "ok": True,
+        "connections": connections_list,
+        "count": len(connections_list)
+    }
+
+
+@APP.post("/api/query")
+async def api_query(request: Request):
+    """
+    Execute a SQL query against a named database connection.
+
+    Simple REST endpoint for n8n - no MCP protocol overhead.
+
+    Request body:
+        {
+            "connection": "prod_ro",
+            "sql": "SELECT COUNT(*) FROM vehicles",
+            "params": ["optional", "parameters"]  // optional
+        }
+
+    Response:
+        {
+            "ok": true,
+            "rows": [...],
+            "row_count": 10,
+            "connection": "prod_ro",
+            "execution_time_ms": 45
+        }
+
+    Error response:
+        {
+            "ok": false,
+            "error": "error message",
+            "error_code": 400
+        }
+    """
+    if not auth_ok(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    start_time = time.time()
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse(
+            status_code=400,
+            content={"ok": False, "error": "Invalid JSON", "error_code": 400}
+        )
+
+    connection = payload.get("connection", "")
+    sql = payload.get("sql", "")
+    params = payload.get("params", [])
+
+    # Validate required fields
+    if not connection:
+        return JSONResponse(
+            status_code=400,
+            content={"ok": False, "error": "Missing required field: connection", "error_code": 400}
+        )
+
+    if not sql:
+        return JSONResponse(
+            status_code=400,
+            content={"ok": False, "error": "Missing required field: sql", "error_code": 400}
+        )
+
+    # Validate connection exists
+    if connection not in CONNECTIONS:
+        available = ", ".join(sorted(CONNECTIONS.keys())) if CONNECTIONS else "none"
+        return JSONResponse(
+            status_code=404,
+            content={
+                "ok": False,
+                "error": f"Unknown connection: '{connection}'. Available: {available}",
+                "error_code": 404
+            }
+        )
+
+    # Check read-only mode
+    if not is_readonly(sql):
+        return JSONResponse(
+            status_code=403,
+            content={
+                "ok": False,
+                "error": "Write operations are disabled. Set ALLOW_WRITE=true to enable.",
+                "error_code": 403
+            }
+        )
+
+    # Execute query
+    try:
+        result = await run_sql(connection, sql, params)
+        execution_time_ms = int((time.time() - start_time) * 1000)
+
+        logger.info(
+            f"API query executed successfully on '{connection}'",
+            extra={
+                "connection": connection,
+                "row_count": result.get("row_count", 0),
+                "duration_ms": execution_time_ms
+            }
+        )
+
+        return {
+            "ok": True,
+            "rows": result["rows"],
+            "row_count": result["row_count"],
+            "connection": connection,
+            "execution_time_ms": execution_time_ms
+        }
+
+    except ValueError as e:
+        logger.warning(f"API query validation error: {e}")
+        return JSONResponse(
+            status_code=400,
+            content={"ok": False, "error": str(e), "error_code": 400}
+        )
+
+    except PermissionError as e:
+        logger.warning(f"API query permission error: {e}")
+        return JSONResponse(
+            status_code=403,
+            content={"ok": False, "error": str(e), "error_code": 403}
+        )
+
+    except ConnectionError as e:
+        logger.error(f"API query connection error: {e}")
+        return JSONResponse(
+            status_code=503,
+            content={"ok": False, "error": "Database unavailable", "error_code": 503}
+        )
+
+    except TimeoutError as e:
+        logger.warning(f"API query timeout: {e}")
+        return JSONResponse(
+            status_code=408,
+            content={"ok": False, "error": str(e), "error_code": 408}
+        )
+
+    except Exception as e:
+        logger.exception(f"API query unexpected error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": f"Internal error: {str(e)}", "error_code": 500}
+        )
+
+
+@APP.post("/api/schema")
+async def api_get_schema(request: Request):
+    """
+    Get database schema information for a connection.
+
+    Useful for AI agents to understand table structures.
+
+    Request body:
+        {
+            "connection": "prod_ro",
+            "table": "vehicles"  // optional - if omitted, returns all tables
+        }
+
+    Response (all tables):
+        {
+            "ok": true,
+            "connection": "prod_ro",
+            "tables": [
+                {
+                    "table_name": "vehicles",
+                    "table_schema": "public"
+                },
+                ...
+            ]
+        }
+
+    Response (specific table):
+        {
+            "ok": true,
+            "connection": "prod_ro",
+            "table": "vehicles",
+            "columns": [
+                {
+                    "column_name": "id",
+                    "data_type": "integer",
+                    "is_nullable": "NO"
+                },
+                ...
+            ]
+        }
+    """
+    if not auth_ok(request):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse(
+            status_code=400,
+            content={"ok": False, "error": "Invalid JSON", "error_code": 400}
+        )
+
+    connection = payload.get("connection", "")
+    table = payload.get("table", "")
+
+    if not connection:
+        return JSONResponse(
+            status_code=400,
+            content={"ok": False, "error": "Missing required field: connection", "error_code": 400}
+        )
+
+    if connection not in CONNECTIONS:
+        available = ", ".join(sorted(CONNECTIONS.keys())) if CONNECTIONS else "none"
+        return JSONResponse(
+            status_code=404,
+            content={
+                "ok": False,
+                "error": f"Unknown connection: '{connection}'. Available: {available}",
+                "error_code": 404
+            }
+        )
+
+    try:
+        if table:
+            # Get columns for specific table
+            sql = """
+                SELECT
+                    column_name,
+                    data_type,
+                    is_nullable,
+                    column_default
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                AND table_name = $1
+                ORDER BY ordinal_position
+            """
+            result = await run_sql(connection, sql, [table])
+
+            return {
+                "ok": True,
+                "connection": connection,
+                "table": table,
+                "columns": result["rows"]
+            }
+        else:
+            # Get all tables
+            sql = """
+                SELECT
+                    table_name,
+                    table_schema
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+            """
+            result = await run_sql(connection, sql)
+
+            return {
+                "ok": True,
+                "connection": connection,
+                "tables": result["rows"]
+            }
+
+    except Exception as e:
+        logger.exception(f"API schema query error: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"ok": False, "error": f"Failed to retrieve schema: {str(e)}", "error_code": 500}
+        )
+
+
 @APP.get(MCP_PATH)
 async def mcp_sse(request: Request):
     """
