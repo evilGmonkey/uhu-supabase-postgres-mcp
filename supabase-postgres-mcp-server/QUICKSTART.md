@@ -45,17 +45,28 @@ nano .env  # or use your favorite editor
 
 **Minimum required configuration:**
 
+After running the commands above, your .env will have MCP_TOKEN set. Now add your database connections. You'll configure BOTH read-only and read-write connections (passwords will be set in Step 3):
+
 ```bash
 # MCP_TOKEN is already set from step 2 above
 MCP_TOKEN=<generated-token-from-step-2>
 
-# Configure at least one database connection
-CONN_prod_HOST=your-supabase-host.supabase.co
-CONN_prod_DBNAME=postgres
-CONN_prod_USER=mcp_readonly
-CONN_prod_PASSWORD=your-database-password
-CONN_prod_SSLMODE=require
+# Read-Only Connection (safe, default)
+CONN_prod_ro_HOST=your-supabase-host.supabase.co
+CONN_prod_ro_DBNAME=postgres
+CONN_prod_ro_USER=mcp_readonly
+CONN_prod_ro_PASSWORD=<will-be-set-in-step-3>
+CONN_prod_ro_SSLMODE=require
+
+# Read-Write Connection (for testing writes)
+CONN_prod_rw_HOST=your-supabase-host.supabase.co
+CONN_prod_rw_DBNAME=postgres
+CONN_prod_rw_USER=mcp_readwrite
+CONN_prod_rw_PASSWORD=<will-be-set-in-step-3>
+CONN_prod_rw_SSLMODE=require
 ```
+
+**Note:** You can use the same host for both connections - they differ only by USER and PASSWORD.
 
 **Alternative for Windows (PowerShell):**
 
@@ -82,25 +93,59 @@ notepad .env
 
 ---
 
-## Step 3: Setup Database Role (1 minute)
+## Step 3: Setup Database Roles (1 minute)
 
-Run this SQL on your database to create a read-only role:
+**Recommended:** Run the comprehensive setup script to create BOTH roles:
+
+```bash
+# Generate strong passwords for both roles
+export READONLY_PASS=$(openssl rand -base64 32)
+export READWRITE_PASS=$(openssl rand -base64 32)
+
+echo "Read-Only Password: $READONLY_PASS"
+echo "Read-Write Password: $READWRITE_PASS"
+
+# Run the setup script (creates both mcp_readonly and mcp_readwrite)
+psql "postgresql://postgres:YOUR_POSTGRES_PASSWORD@HOST:PORT/DATABASE" \
+  -f setup-database-roles.sql
+```
+
+**Alternative - Quick Manual Setup (creates both roles):**
 
 ```sql
--- Option 1: Run the provided script
--- psql "postgresql://postgres:PASSWORD@HOST:PORT/DATABASE" -f setup-readonly-role.sql
-
--- Option 2: Quick manual setup
-CREATE ROLE mcp_readonly LOGIN PASSWORD 'your-password-here';
+-- Read-Only Role
+CREATE ROLE mcp_readonly LOGIN PASSWORD 'your-readonly-password';
 GRANT CONNECT ON DATABASE postgres TO mcp_readonly;
 GRANT USAGE ON SCHEMA public TO mcp_readonly;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO mcp_readonly;
+ALTER ROLE mcp_readonly BYPASSRLS;  -- For Supabase with RLS
 
--- For Supabase with RLS (Row Level Security)
-ALTER ROLE mcp_readonly BYPASSRLS;
+-- Read-Write Role
+CREATE ROLE mcp_readwrite LOGIN PASSWORD 'your-readwrite-password';
+GRANT CONNECT ON DATABASE postgres TO mcp_readwrite;
+GRANT USAGE ON SCHEMA public TO mcp_readwrite;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO mcp_readwrite;
+GRANT USAGE, UPDATE ON ALL SEQUENCES IN SCHEMA public TO mcp_readwrite;
+ALTER ROLE mcp_readwrite BYPASSRLS;  -- For Supabase with RLS
 ```
 
-**Use the same password in your .env file!**
+**Update your .env file with BOTH connections:**
+
+```bash
+# Read-Only Connection (safe, default)
+CONN_prod_ro_HOST=your-supabase-host.supabase.co
+CONN_prod_ro_DBNAME=postgres
+CONN_prod_ro_USER=mcp_readonly
+CONN_prod_ro_PASSWORD=$READONLY_PASS
+CONN_prod_ro_SSLMODE=require
+
+# Read-Write Connection (for testing writes)
+CONN_prod_rw_HOST=your-supabase-host.supabase.co
+CONN_prod_rw_DBNAME=postgres
+CONN_prod_rw_USER=mcp_readwrite
+CONN_prod_rw_PASSWORD=$READWRITE_PASS
+CONN_prod_rw_SSLMODE=require
+```
 
 ---
 
@@ -123,12 +168,12 @@ curl http://localhost:8799/healthz
   "ok": true,
   "time": 1704096000,
   "server": "supabase-postgres-mcp",
-  "connections": 1,
-  "connection_names": ["prod"]
+  "connections": 2,
+  "connection_names": ["prod_ro", "prod_rw"]
 }
 ```
 
-If you see your connection name(s), you're ready! ✅
+If you see BOTH connection names (prod_ro and prod_rw), you're ready! ✅
 
 ---
 
@@ -191,23 +236,57 @@ Paste this and replace `YOUR_MCP_TOKEN_HERE`:
 
 ---
 
-## Step 6: Test It Out! (30 seconds)
+## Step 6: Test Both Connections! (1 minute)
 
-Open Cursor chat and try:
+Open Cursor chat and test BOTH connections:
 
-```
-List all tables in the prod database
-```
+### Test Read-Only Connection (prod_ro):
 
 ```
-Show me the schema for the users table
+List all tables in the prod_ro database
 ```
 
 ```
-Query prod: SELECT version()
+Query prod_ro: SELECT version()
 ```
 
-**It works!** 🎉
+```
+Show me the user count from prod_ro
+```
+
+### Test Read-Write Connection (prod_rw):
+
+```
+Query prod_rw: SELECT version()
+```
+
+```
+Test write access on prod_rw: CREATE TABLE test_mcp (id INT, created_at TIMESTAMP DEFAULT NOW())
+```
+
+```
+Query prod_rw: INSERT INTO test_mcp (id) VALUES (1), (2), (3)
+```
+
+```
+Query prod_rw: SELECT * FROM test_mcp
+```
+
+```
+Clean up test table on prod_rw: DROP TABLE test_mcp
+```
+
+### Verify Read-Only Protection:
+
+Try this on prod_ro (should FAIL):
+
+```
+Query prod_ro: CREATE TABLE should_fail (id INT)
+```
+
+You should get an error - this confirms read-only protection works! ✅
+
+**Both connections work!** 🎉
 
 ---
 
