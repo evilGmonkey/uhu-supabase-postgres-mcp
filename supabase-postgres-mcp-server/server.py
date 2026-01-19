@@ -19,13 +19,14 @@ from fastapi.middleware.cors import CORSMiddleware
 # Author: Frederick Mbuya
 # License: MIT
 #
-# A Model Context Protocol (MCP) server that provides read-only SQL access
-# to multiple named Supabase/PostgreSQL databases via HTTP + SSE transport.
+# A Model Context Protocol (MCP) server that provides SQL access and schema
+# introspection to multiple named Supabase/PostgreSQL databases via HTTP + SSE.
 #
 # Features:
 # - Multiple named database connections (CONN_<name>_*)
 # - Read-only mode with optional write access (ALLOW_WRITE)
 # - Automatic query limits and timeouts
+# - Schema introspection (tables, columns)
 # - Structured JSON logging with request tracking
 # - Comprehensive error handling
 # - Bearer token authentication
@@ -35,8 +36,15 @@ from fastapi.middleware.cors import CORSMiddleware
 # - GET /mcp  -> SSE stream for real-time updates
 # - POST /mcp -> JSON-RPC 2.0 requests (initialize, tools/list, tools/call)
 #
-# Tool:
-# - sql.query(connection, sql, params?) -> Execute SQL on named connection
+# MCP Tools (following best practices for Cursor IDE):
+# - postgres.list_connections() -> List all configured database connections
+# - postgres.get_schema(connection, table?) -> Retrieve database schema info
+# - postgres.query(connection, sql, params?) -> Execute SQL on named connection
+#
+# REST API (n8n-friendly endpoints):
+# - GET /api/connections -> List database connections
+# - POST /api/query -> Execute SQL query
+# - POST /api/schema -> Get schema information
 # ================================================================================
 
 APP = FastAPI(title="Supabase Postgres MCP Server", version="1.0.0")
@@ -353,31 +361,70 @@ async def run_sql(connection: str, sql: str, params: Optional[list] = None) -> D
 def tool_catalog() -> Dict[str, List[Dict[str, Any]]]:
     """
     Return the MCP tool catalog with available connections.
+
+    Exposes three tools following MCP best practices:
+    1. postgres.list_connections - Discover available database connections
+    2. postgres.get_schema - Retrieve table and column information
+    3. postgres.query - Execute SQL queries
     """
     available_connections = sorted(CONNECTIONS.keys())
     connection_list = ", ".join(available_connections) if available_connections else "none configured"
 
     return {
         "tools": [
+            # Tool 1: List available database connections
             {
-                "name": "sql.query",
-                "description": f"Execute a SQL query against a named Supabase/PostgreSQL database. Available connections: {connection_list}",
+                "name": "postgres.list_connections",
+                "description": "List all configured database connections",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False
+                }
+            },
+
+            # Tool 2: Get database schema information
+            {
+                "name": "postgres.get_schema",
+                "description": "Retrieve database schema information for tables and columns",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
                         "connection": {
                             "type": "string",
-                            "description": f"Name of the database connection to use. Available: {connection_list}",
+                            "description": f"Database connection name. Available: {connection_list}",
+                            "enum": available_connections if available_connections else []
+                        },
+                        "table": {
+                            "type": "string",
+                            "description": "Table name to get columns for (optional - omit to list all tables)"
+                        }
+                    },
+                    "required": ["connection"],
+                    "additionalProperties": False
+                }
+            },
+
+            # Tool 3: Execute SQL query
+            {
+                "name": "postgres.query",
+                "description": f"Execute SQL query on a database connection. Available: {connection_list}",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "connection": {
+                            "type": "string",
+                            "description": f"Database connection name. Available: {connection_list}",
                             "enum": available_connections if available_connections else []
                         },
                         "sql": {
                             "type": "string",
-                            "description": "SQL query to execute (SELECT, or other if ALLOW_WRITE=true)"
+                            "description": "SQL query to execute (SELECT queries, or write operations if ALLOW_WRITE=true)"
                         },
                         "params": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "Optional parameters for parameterized queries (use $1, $2, etc.)"
+                            "description": "Optional parameters for parameterized queries (use $1, $2, etc. in SQL)"
                         }
                     },
                     "required": ["connection", "sql"],
@@ -844,7 +891,112 @@ async def mcp_endpoint(request: Request):
         name = params.get("name")
         args = params.get("arguments", {})
 
-        if name == "sql.query":
+        # Tool 1: postgres.list_connections
+        if name == "postgres.list_connections":
+            connections_list = [
+                {"name": conn_name, "description": f"Database connection: {conn_name}"}
+                for conn_name in sorted(CONNECTIONS.keys())
+            ]
+
+            result_data = {
+                "connections": connections_list,
+                "count": len(connections_list)
+            }
+
+            content = {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(result_data, ensure_ascii=False)
+                    }
+                ]
+            }
+            reply = {"jsonrpc": "2.0", "id": _id, "result": content}
+
+            logger.info("Listed connections", extra={"request_id": _id, "count": len(connections_list)})
+
+        # Tool 2: postgres.get_schema
+        elif name == "postgres.get_schema":
+            connection = args.get("connection", "")
+            table = args.get("table", "")
+
+            # Validate connection
+            if not connection:
+                reply = {
+                    "jsonrpc": "2.0",
+                    "id": _id,
+                    "error": {"code": 400, "message": "Missing required parameter: connection"}
+                }
+            elif connection not in CONNECTIONS:
+                available = ", ".join(sorted(CONNECTIONS.keys())) if CONNECTIONS else "none"
+                reply = {
+                    "jsonrpc": "2.0",
+                    "id": _id,
+                    "error": {"code": 400, "message": f"Unknown connection: '{connection}'. Available: {available}"}
+                }
+            else:
+                try:
+                    if table:
+                        # Get columns for specific table
+                        sql = """
+                            SELECT
+                                column_name,
+                                data_type,
+                                is_nullable,
+                                column_default
+                            FROM information_schema.columns
+                            WHERE table_schema = 'public'
+                            AND table_name = $1
+                            ORDER BY ordinal_position
+                        """
+                        result = await run_sql(connection, sql, [table])
+                        result_data = {
+                            "connection": connection,
+                            "table": table,
+                            "columns": result["rows"]
+                        }
+                    else:
+                        # Get all tables
+                        sql = """
+                            SELECT
+                                table_name,
+                                table_schema
+                            FROM information_schema.tables
+                            WHERE table_schema = 'public'
+                            AND table_type = 'BASE TABLE'
+                            ORDER BY table_name
+                        """
+                        result = await run_sql(connection, sql)
+                        result_data = {
+                            "connection": connection,
+                            "tables": result["rows"]
+                        }
+
+                    content = {
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": json.dumps(result_data, ensure_ascii=False)
+                            }
+                        ]
+                    }
+                    reply = {"jsonrpc": "2.0", "id": _id, "result": content}
+
+                    logger.info(
+                        f"Schema retrieved for '{connection}'",
+                        extra={"request_id": _id, "connection": connection, "table": table or "all"}
+                    )
+
+                except Exception as e:
+                    reply = {
+                        "jsonrpc": "2.0",
+                        "id": _id,
+                        "error": {"code": 500, "message": f"Failed to retrieve schema: {str(e)}"}
+                    }
+                    logger.exception(f"Schema retrieval error: {e}", extra={"request_id": _id})
+
+        # Tool 3: postgres.query (renamed from sql.query)
+        elif name == "postgres.query" or name == "sql.query":  # Support old name for backward compatibility
             connection = args.get("connection", "")
             sql = args.get("sql", "")
             query_params = args.get("params", [])
