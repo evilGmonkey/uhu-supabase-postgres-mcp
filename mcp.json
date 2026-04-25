@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "chazlyticspostgres": {
+      "url": "http://gaia:8799/mcp",
+      "headers": {
+        "Authorization": "Bearer JWzS0TVvf+jS6MdcoNxl85xggwbv0W31yIPLItE2DJY="
+      }
+    }
+  }
+}

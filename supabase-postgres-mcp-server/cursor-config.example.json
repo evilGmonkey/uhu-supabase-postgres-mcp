@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "postgres": {
+      "url": "http://localhost:8799/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_MCP_TOKEN_HERE"
+      }
+    }
+  }
+}

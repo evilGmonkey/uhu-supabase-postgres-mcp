@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: supabase-postgres-mcp
+    restart: unless-stopped
+
+    ports:
+      - "${MCP_PORT:-8799}:8799"
+
+    # Load ALL environment variables from .env file
+    # This includes MCP_TOKEN and all CONN_* variables dynamically
+    env_file:
+      - .env
+
+    environment:
+      # ===== Server Configuration =====
+      # These settings can be overridden in .env
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8799
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8799/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+    networks:
+      - mcp-network
+
+networks:
+  mcp-network:
+    driver: bridge
