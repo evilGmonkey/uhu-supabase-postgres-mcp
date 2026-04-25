@@ -24,3 +24,24 @@ mcp.json, TODO.md, TESTING_CURSOR.md) pointing at an inner
 `supabase-postgres-mcp-server/` with the actual server. That structure is
 preserved here verbatim. Flattening (collapsing the inner directory up)
 is a future cleanup if the duplication starts to bite.
+
+## Publishing public updates
+
+Greybook is now the source of truth; the public repo at
+`https://github.com/evilGmonkey/uhu-supabase-postgres-mcp` is a one-way
+mirror. Run from the greybook repo root after committing changes here:
+
+```bash
+git subtree push --prefix=tools/supabase-mcp \
+  git@github.com:evilGmonkey/uhu-supabase-postgres-mcp.git master
+```
+
+Do not commit directly to the public repo. If `subtree push` fails because
+the public repo has diverged, reset it via force-push:
+
+```bash
+git subtree split --prefix=tools/supabase-mcp -b export-supabase-mcp && \
+  git push -f git@github.com:evilGmonkey/uhu-supabase-postgres-mcp.git \
+    export-supabase-mcp:master && \
+  git branch -D export-supabase-mcp
+```
